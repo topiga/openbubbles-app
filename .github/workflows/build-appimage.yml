@@ -58,7 +58,7 @@ jobs:
 
       - name: Copy binaries and libraries
         run: |
-          cp -r bluebubbles-x86_64/bluebubbles AppDir/usr/bin/
+          cp -r bluebubbles-x86_64/bluebubbles AppDir/usr/bin/openbubbles
           cp -r bluebubbles-x86_64/data AppDir/usr/bin/
           cp -r bluebubbles-x86_64/lib AppDir/usr/bin/
 
@@ -68,7 +68,7 @@ jobs:
           exclude_patterns="^(linux-vdso|ld-linux|libc\.so|libpthread\.so|libm\.so|libdl\.so|librt\.so|libgcc_s\.so|libstdc\+\+\.so|libX11\.so|libxcb\.so|libXau\.so|libXdmcp\.so|libglapi\.so|libGL\.so|libEGL\.so|libgbm\.so|libdrm\.so|libwayland|libasound\.so|libresolv\.so|libnss|libdbus|libcrypt\.so|libuuid\.so|libz\.so|libgobject|libglib|libgthread|libgmodule|libgio|libgdk|libgtk|libpango|libcairo|libatk|libgdk_pixbuf|libfontconfig|libfreetype|libharfbuzz|libssl|libcrypto)"
           
           # Start with the main binary
-          check_files=("AppDir/usr/bin/bluebubbles")
+          check_files=("AppDir/usr/bin/openbubbles")
           
           # Add any plugins
           for f in AppDir/usr/bin/lib/*.so; do
@@ -120,26 +120,26 @@ jobs:
 
       - name: Setup Application Icons
         run: |
-          cp AppDir/usr/bin/data/flutter_assets/assets/icon/icon.png AppDir/bluebubbles.png
-          cp AppDir/usr/bin/data/flutter_assets/assets/icon/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/bluebubbles.png
-          cp AppDir/usr/bin/data/flutter_assets/assets/icon/bb-icon.svg AppDir/bluebubbles.svg
-          cp AppDir/usr/bin/data/flutter_assets/assets/icon/bb-icon.svg AppDir/usr/share/icons/hicolor/scalable/apps/bluebubbles.svg
+          cp AppDir/usr/bin/data/flutter_assets/assets/icon/icon.png AppDir/openbubbles.png
+          cp AppDir/usr/bin/data/flutter_assets/assets/icon/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/openbubbles.png
+          cp AppDir/usr/bin/data/flutter_assets/assets/icon/bb-icon.svg AppDir/openbubbles.svg
+          cp AppDir/usr/bin/data/flutter_assets/assets/icon/bb-icon.svg AppDir/usr/share/icons/hicolor/scalable/apps/openbubbles.svg
 
       - name: Create Desktop Entry File
         run: |
-          cat << 'EOF' > AppDir/bluebubbles.desktop
+          cat << 'EOF' > AppDir/openbubbles.desktop
           [Desktop Entry]
-          Name=BlueBubbles
+          Name=OpenBubbles
           Comment=A clean, beautiful, and feature-rich iMessage client for Linux
-          Exec=bluebubbles
-          Icon=bluebubbles
+          Exec=openbubbles
+          Icon=openbubbles
           Type=Application
           Categories=Network;InstantMessaging;Chat;
           Terminal=false
           StartupWMClass=bluebubbles
           EOF
           
-          cp AppDir/bluebubbles.desktop AppDir/usr/share/applications/bluebubbles.desktop
+          cp AppDir/openbubbles.desktop AppDir/usr/share/applications/openbubbles.desktop
 
       - name: Create AppRun Entrypoint Script
         run: |
@@ -150,7 +150,7 @@ jobs:
           export LD_LIBRARY_PATH="${HERE}/usr/bin/lib:${HERE}/usr/lib:${LD_LIBRARY_PATH}"
           export PATH="${HERE}/usr/bin:${PATH}"
           
-          exec "${HERE}/usr/bin/bluebubbles" "$@"
+          exec "${HERE}/usr/bin/openbubbles" "$@"
           EOF
           
           chmod +x AppDir/AppRun
@@ -168,6 +168,6 @@ jobs:
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BlueBubbles-AppImage
-          path: BlueBubbles-x86_64.AppImage
+          name: OpenBubbles-AppImage
+          path: OpenBubbles-x86_64.AppImage
           if-no-files-found: error
