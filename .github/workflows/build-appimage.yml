@@ -90,6 +90,15 @@ jobs:
                       if echo "$name" | grep -q -E "$exclude_patterns"; then
                           continue
                       fi
+                      # If the library is already in the destination folder, skip copying but resolve its dependencies
+                      if [ "$dep" -ef "AppDir/usr/bin/lib/$name" ]; then
+                          if [ -z "${copied_libs[$name]}" ]; then
+                              copied_libs["$name"]=1
+                              resolve_deps "$dep"
+                          fi
+                          continue
+                      fi
+
                       # Bundle and resolve recursively if not already processed
                       if [ -z "${copied_libs[$name]}" ]; then
                           echo "Bundling library: $name (from $dep)"
