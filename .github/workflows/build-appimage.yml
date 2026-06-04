@@ -1,0 +1,164 @@
+name: Build BlueBubbles AppImage
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Run weekly to automatically pull new releases
+    - cron: '0 0 * * 0'
+
+jobs:
+  build:
+    name: Build AppImage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libmpv-dev mpv libayatana-appindicator3-dev libsecret-1-dev
+          
+          # Find libmpv.so and ensure a symlink for libmpv.so.1 exists in system library paths
+          if ! ldconfig -p | grep -q libmpv.so.1; then
+            echo "libmpv.so.1 not registered in ldconfig. Attempting to create symlink..."
+            MPV_SO=$(find /usr/lib -name "libmpv.so" -o -name "libmpv.so.*" | head -n 1)
+            if [ -n "$MPV_SO" ]; then
+              echo "Found libmpv at $MPV_SO. Symlinking to /usr/lib/libmpv.so.1..."
+              sudo ln -sf "$MPV_SO" /usr/lib/libmpv.so.1
+              sudo ldconfig
+            else
+              echo "WARNING: Could not find libmpv.so to symlink!"
+            fi
+          fi
+
+      - name: Download latest BlueBubbles release tarball
+        run: |
+          curl -Lo bluebubbles-linux-x86_64.tar https://github.com/OpenBubbles/openbubbles-app/releases/latest/download/bluebubbles-linux-x86_64.tar
+
+      - name: Extract tarball
+        run: |
+          mkdir -p bluebubbles-x86_64
+          tar -xf bluebubbles-linux-x86_64.tar -C bluebubbles-x86_64/
+
+      - name: Create AppDir directory structure
+        run: |
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          mkdir -p AppDir/usr/share/icons/hicolor/scalable/apps
+
+      - name: Copy binaries and libraries
+        run: |
+          cp -r bluebubbles-x86_64/bluebubbles AppDir/usr/bin/
+          cp -r bluebubbles-x86_64/data AppDir/usr/bin/
+          cp -r bluebubbles-x86_64/lib AppDir/usr/bin/
+
+      - name: Dynamic dependency resolver (bundle non-standard libraries)
+        run: |
+          # Exclude patterns (core system libraries that should not be bundled to keep AppImage portable)
+          exclude_patterns="^(linux-vdso|ld-linux|libc\.so|libpthread\.so|libm\.so|libdl\.so|librt\.so|libgcc_s\.so|libstdc\+\+\.so|libX11\.so|libxcb\.so|libXau\.so|libXdmcp\.so|libglapi\.so|libGL\.so|libEGL\.so|libgbm\.so|libdrm\.so|libwayland|libasound\.so|libresolv\.so|libnss|libdbus|libcrypt\.so|libuuid\.so|libz\.so|libgobject|libglib|libgthread|libgmodule|libgio|libgdk|libgtk|libpango|libcairo|libatk|libgdk_pixbuf|libfontconfig|libfreetype|libharfbuzz|libssl|libcrypto)"
+          
+          # Start with the main binary
+          check_files=("AppDir/usr/bin/bluebubbles")
+          
+          # Add any plugins
+          for f in AppDir/usr/bin/lib/*.so; do
+              if [ -f "$f" ]; then
+                  check_files+=("$f")
+              fi
+          done
+          
+          declare -A copied_libs
+          
+          # Recursive dependency resolver
+          resolve_deps() {
+              local file="$1"
+              local deps=$(ldd "$file" 2>/dev/null | awk '/=>/ {print $3}')
+              for dep in $deps; do
+                  if [ -f "$dep" ]; then
+                      local name=$(basename "$dep")
+                      # Skip system-level libraries
+                      if echo "$name" | grep -q -E "$exclude_patterns"; then
+                          continue
+                      fi
+                      # Bundle and resolve recursively if not already processed
+                      if [ -z "${copied_libs[$name]}" ]; then
+                          echo "Bundling library: $name (from $dep)"
+                          cp "$dep" AppDir/usr/bin/lib/
+                          chmod 755 "AppDir/usr/bin/lib/$name"
+                          copied_libs["$name"]=1
+                          resolve_deps "$dep"
+                      fi
+                  fi
+              done
+          }
+          
+          # Run the resolver
+          for file in "${check_files[@]}"; do
+              if [ -f "$file" ]; then
+                  resolve_deps "$file"
+              fi
+          done
+
+      - name: Setup Application Icons
+        run: |
+          cp AppDir/usr/bin/data/flutter_assets/assets/icon/icon.png AppDir/bluebubbles.png
+          cp AppDir/usr/bin/data/flutter_assets/assets/icon/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/bluebubbles.png
+          cp AppDir/usr/bin/data/flutter_assets/assets/icon/bb-icon.svg AppDir/bluebubbles.svg
+          cp AppDir/usr/bin/data/flutter_assets/assets/icon/bb-icon.svg AppDir/usr/share/icons/hicolor/scalable/apps/bluebubbles.svg
+
+      - name: Create Desktop Entry File
+        run: |
+          cat << 'EOF' > AppDir/bluebubbles.desktop
+          [Desktop Entry]
+          Name=BlueBubbles
+          Comment=A clean, beautiful, and feature-rich iMessage client for Linux
+          Exec=bluebubbles
+          Icon=bluebubbles
+          Type=Application
+          Categories=Network;InstantMessaging;Chat;
+          Terminal=false
+          StartupWMClass=bluebubbles
+          EOF
+          
+          cp AppDir/bluebubbles.desktop AppDir/usr/share/applications/bluebubbles.desktop
+
+      - name: Create AppRun Entrypoint Script
+        run: |
+          cat << 'EOF' > AppDir/AppRun
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          
+          export LD_LIBRARY_PATH="${HERE}/usr/bin/lib:${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          export PATH="${HERE}/usr/bin:${PATH}"
+          
+          exec "${HERE}/usr/bin/bluebubbles" "$@"
+          EOF
+          
+          chmod +x AppDir/AppRun
+
+      - name: Download appimagetool
+        run: |
+          curl -Lo appimagetool-x86_64.AppImage https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+
+      - name: Package AppImage
+        run: |
+          export ARCH=x86_64
+          ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir
+
+      - name: Upload AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlueBubbles-AppImage
+          path: BlueBubbles-x86_64.AppImage
+          if-no-files-found: error
