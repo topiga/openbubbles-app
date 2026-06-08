@@ -68,8 +68,8 @@ jobs:
           curl -sL https://raw.githubusercontent.com/AppImageCommunity/pkg2appimage/master/excludelist -o excludelist.txt
           official_excludes=$(grep -v '^#' excludelist.txt | grep -v '^$' | sed 's/\./\\./g' | tr '\n' '|')
           
-          # Custom/newer base library exclusions (e.g. libmount, libpcre, libselinux, libffi, libblkid, libsystemd, libssl, libcrypto, etc.)
-          custom_excludes="linux-vdso|ld-linux|libmount|libpcre|libselinux|libblkid|libffi|libsystemd|libcap|libgcrypt|libgpg-error|liblzma|libzstd|liblz4|libbz2|libexpat|libudev|libdw|libelf|libssl|libcrypto"
+          # Custom/newer base library exclusions (e.g. libmount, libpcre, libselinux, libblkid, libsystemd, libudev, libssl, libcrypto, etc.)
+          custom_excludes="linux-vdso|ld-linux|libmount|libpcre|libselinux|libblkid|libsystemd|libudev|libssl|libcrypto"
           
           exclude_patterns="^(${official_excludes}${custom_excludes})"
           
