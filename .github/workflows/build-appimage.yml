@@ -64,8 +64,14 @@ jobs:
 
       - name: Dynamic dependency resolver (bundle non-standard libraries)
         run: |
-          # Exclude patterns (core system libraries that should not be bundled to keep AppImage portable)
-          exclude_patterns="^(linux-vdso|ld-linux|libc\.so|libpthread\.so|libm\.so|libdl\.so|librt\.so|libgcc_s\.so|libstdc\+\+\.so|libX11\.so|libxcb\.so|libXau\.so|libXdmcp\.so|libglapi\.so|libGL\.so|libEGL\.so|libgbm\.so|libdrm\.so|libwayland|libasound\.so|libresolv\.so|libnss|libdbus|libcrypt\.so|libuuid\.so|libz\.so|libgobject|libglib|libgthread|libgmodule|libgio|libgdk|libgtk|libpango|libcairo|libatk|libgdk_pixbuf|libfontconfig|libfreetype|libharfbuzz|libssl|libcrypto)"
+          # Download official AppImage excludelist and parse it dynamically
+          curl -sL https://raw.githubusercontent.com/AppImageCommunity/pkg2appimage/master/excludelist -o excludelist.txt
+          official_excludes=$(grep -v '^#' excludelist.txt | grep -v '^$' | sed 's/\./\\./g' | tr '\n' '|')
+          
+          # Custom/newer base library exclusions (e.g. libmount, libpcre, libselinux, libffi, libblkid, libsystemd, libssl, libcrypto, etc.)
+          custom_excludes="linux-vdso|ld-linux|libmount|libpcre|libselinux|libblkid|libffi|libsystemd|libcap|libgcrypt|libgpg-error|liblzma|libzstd|liblz4|libbz2|libexpat|libudev|libdw|libelf|libssl|libcrypto"
+          
+          exclude_patterns="^(${official_excludes}${custom_excludes})"
           
           # Start with the main binary
           check_files=("AppDir/usr/bin/openbubbles")
